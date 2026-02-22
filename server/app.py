@@ -23,6 +23,7 @@ SAVE_COOLDOWN_SECONDS = 1800  # 30 minut
 last_save_timestamp = 0
 LOG_DIR = "logs"
 CAPTURE_DIR = "captures"
+LOG_FILE_PATH = os.path.join(LOG_DIR, "cat_activity.txt")
 
 for d in [LOG_DIR, CAPTURE_DIR]:
     if not os.path.exists(d):
@@ -30,7 +31,6 @@ for d in [LOG_DIR, CAPTURE_DIR]:
 
 # --- FUNKCJA CZASU (Poprawka o +1h) ---
 def get_now():
-    # Jeśli nadal masz godzinę do tyłu, zwiększ hours=1. Jeśli serwer ma OK, ustaw 0.
     return datetime.now() + timedelta(hours=1)
 
 # --- KONFIGURACJA WYGŁADZANIA ---
@@ -50,7 +50,16 @@ camera_settings = {
 }
 
 def log(message):
-    print(f"[{get_now().strftime('%H:%M:%S')}] {message}", flush=True)
+    """Zapisuje wiadomość do konsoli i do pliku logów aktywności."""
+    now_str = get_now().strftime('%Y-%m-%d %H:%M:%S')
+    formatted_msg = f"[{now_str}] {message}"
+    print(formatted_msg, flush=True)
+    
+    try:
+        with open(LOG_FILE_PATH, "a", encoding="utf-8") as f:
+            f.write(formatted_msg + "\n")
+    except Exception as e:
+        print(f"Błąd zapisu loga: {e}")
 
 def save_cat_event(img):
     global last_save_timestamp
@@ -65,15 +74,11 @@ def save_cat_event(img):
         photo_path = os.path.join(CAPTURE_DIR, photo_name)
         cv2.imwrite(photo_path, img)
         
-        log_path = os.path.join(LOG_DIR, "cat_activity.txt")
-        with open(log_path, "a", encoding="utf-8") as f:
-            f.write(f"[{now.strftime('%Y-%m-%d %H:%M:%S')}] Wykryto kota! Foto: {photo_name}\n")
-        
-        log(f"📸 ZDARZENIE ZAPISANE: {photo_path}")
+        log(f"📸 WYKRYTO KOTA! Foto: {photo_name}")
 
 def ai_worker():
     global last_cat_seen, last_detection_timestamp, latest_frame, smoothed_box
-    log("Wątek AI uruchomiony.")
+    print(f"[{get_now().strftime('%H:%M:%S')}] Wątek AI uruchomiony.", flush=True)
     
     while True:
         frame_bytes = ai_queue.get()
@@ -119,11 +124,11 @@ def ai_worker():
                     if current_time - last_detection_timestamp > COOLDOWN_SECONDS:
                         last_detection_timestamp = current_time
                         last_cat_seen = get_now().strftime("%H:%M:%S")
-                        log("🔥 KOT WIDOCZNY")
+                        print(f"[{last_cat_seen}] 🔥 KOT WIDOCZNY", flush=True)
                 else:
                     smoothed_box = None
         except Exception as e:
-            log(f"Błąd AI: {e}")
+            print(f"Błąd AI: {e}")
         ai_queue.task_done()
 
 threading.Thread(target=ai_worker, daemon=True).start()
@@ -138,12 +143,19 @@ def index():
 def get_status():
     return jsonify({"last_seen": last_cat_seen})
 
+@app.route('/log_event', methods=['POST'])
+def log_event():
+    """Odbiera zdarzenia sieciowe z frontendu i zapisuje je do logów."""
+    data = request.json
+    event_msg = data.get('event', 'Nieznane zdarzenie')
+    log(f"📱 STATUS: {event_msg}")
+    return jsonify({"status": "ok"})
+
 @app.route('/settings', methods=['GET', 'POST'])
 def handle_settings():
     global camera_settings
     if request.method == 'POST':
         data = request.json
-        # Ograniczenie zoomu do 3.0
         new_zoom = float(data.get("zoom", camera_settings["zoom"]))
         camera_settings["zoom"] = max(1.0, min(3.0, new_zoom))
         camera_settings["flashlight"] = bool(data.get("flashlight", camera_settings["flashlight"]))
@@ -152,10 +164,11 @@ def handle_settings():
 
 @app.route('/get_logs')
 def get_logs():
-    path = os.path.join(LOG_DIR, "cat_activity.txt")
-    if os.path.exists(path):
-        with open(path, "r", encoding="utf-8") as f:
-            return f.read()
+    if os.path.exists(LOG_FILE_PATH):
+        with open(LOG_FILE_PATH, "r", encoding="utf-8") as f:
+            # Zwracamy ostatnie 50 linii dla czytelności
+            lines = f.readlines()
+            return "".join(lines[-50:])
     return "Brak aktywności w logach."
 
 @app.route('/get_captures')

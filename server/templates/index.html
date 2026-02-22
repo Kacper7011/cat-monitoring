@@ -2,14 +2,15 @@
 <html lang="pl">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Cat Monitor Pro</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
     <div class="dashboard">
         <header>
-            <h1>🐾 Cat Detector <span class="badge">Live</span></h1>
-            <div class="status-indicator">Ostatnio: <span id="last-seen">{{ last_seen }}</span></div>
+            <h1>🐾 Cat Detector <span id="live-badge" class="badge">Live</span></h1>
+            <div class="status-indicator">Ostatnio zaobserwowano: <span id="last-seen">{{ last_seen }}</span></div>
         </header>
 
         <section class="controls">
@@ -22,7 +23,7 @@
 
         <main class="viewport">
             <div class="stream-container">
-                <img src="{{ url_for('video_feed') }}" alt="Stream">
+                <img src="{{ url_for('video_feed') }}" alt="Stream" id="main-stream">
             </div>
         </main>
 

@@ -1,9 +1,17 @@
 services:
   web-streamer:
-    build: ./server
+    build: 
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: cat-monitor-server
+    restart: unless-stopped
     ports:
       - "5000:5000"
     volumes:
-      - ./server:/app
+      # Mapujemy tylko dane, które aplikacja generuje, 
+      # a nie cały kod źródłowy (dzięki temu kod w obrazie jest bezpieczny)
+      - ./server/captures:/app/captures
+      - ./server/logs:/app/logs
     environment:
       - APP_ENV=development
+      - PYTHONUNBUFFERED=1
