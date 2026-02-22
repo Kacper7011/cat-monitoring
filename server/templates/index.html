@@ -1,21 +1,42 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CatWatch AI - Live Feed</title>
-    <style>
-        body { font-family: Arial, sans-serif; background: #1a1a1a; color: white; text-align: center; }
-        .container { margin-top: 50px; }
-        #stream { width: 80%; max-width: 800px; border: 5px solid #333; border-radius: 10px; }
-        .status { color: #0f0; margin-bottom: 20px; }
-    </style>
+    <title>AI Cat Monitor Pro</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-    <div class="container">
-        <h1>🐾 CatWatch AI Live Feed</h1>
-        <div class="status">● System Online</div>
-        <img id="stream" src="{{ url_for('video_feed') }}" alt="Live Stream">
+    <div class="dashboard">
+        <header>
+            <h1>🐾 Cat Detector <span class="badge">Live</span></h1>
+            <div class="status-indicator">Ostatnio: <span id="last-seen">{{ last_seen }}</span></div>
+        </header>
+
+        <section class="controls">
+            <div class="control-group">
+                <label>Zoom: <span id="zoom-val">1.0</span>x</label>
+                <input type="range" id="zoom-slider" min="1" max="3" step="0.1" value="1">
+            </div>
+            <button id="torch-btn" class="btn">Latarka: OFF</button>
+        </section>
+
+        <main class="viewport">
+            <div class="stream-container">
+                <img src="{{ url_for('video_feed') }}" alt="Stream">
+            </div>
+        </main>
+
+        <section class="archive">
+            <div class="archive-box">
+                <h3>📜 Dziennik aktywności</h3>
+                <pre id="log-viewer">Ładowanie...</pre>
+            </div>
+            <div class="archive-box">
+                <h3>📸 Ostatnie zdjęcia</h3>
+                <div id="gallery" class="gallery-grid"></div>
+            </div>
+        </section>
     </div>
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>

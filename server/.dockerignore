@@ -1,0 +1,14 @@
+# Dane generowane przez aplikację (nie chcemy ich w obrazie)
+captures/
+logs/
+
+# Konfiguracja Gita i Docker
+.git/
+.gitignore
+docker-compose.yml
+Dockerfile
+README.md
+
+# Pliki Pythona
+__pycache__/
+*.pyc

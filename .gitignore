@@ -1,0 +1,36 @@
+# Python & Server 
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+server/recordings/
+server/logs/
+
+# Android 
+.gradle/
+build/
+local.properties
+.navigation/
+captures/
+*.iml
+.externalNativeBuild/
+.cxx/
+*.keystore
+!debug.keystore
+
+# AI & Models
+training-scripts/datasets/
+*.tflite
+*.h5
+*.onnx
+
+# OS & IDE
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# logs && captures
+server/logs
+server/captures
