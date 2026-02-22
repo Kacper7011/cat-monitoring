@@ -4,20 +4,45 @@ __pycache__/
 *$py.class
 venv/
 .env
+*.log
+# Katalogi z danymi serwera
 server/recordings/
 server/logs/
+server/captures/
 
-# Android 
+# Android (Global & Build)
 .gradle/
 build/
+*/build/
 local.properties
 .navigation/
 captures/
 *.iml
 .externalNativeBuild/
 .cxx/
+
+# Klucze i podpisy
 *.keystore
+*.jks
 !debug.keystore
+
+# Cache i logi Android Studio
+*.itls
+*.iws
+.project
+.classpath
+.settings/
+.idea/caches/
+.idea/libraries/
+.idea/modules.xml
+.idea/workspace.xml
+.idea/navEditor.xml
+.idea/assetWizardSettings.xml
+
+# Pliki generowane przez system i lint
+.google_services/
+lint/intermediate-res/
+lint/generated/
 
 # AI & Models
 training-scripts/datasets/
@@ -25,12 +50,9 @@ training-scripts/datasets/
 *.h5
 *.onnx
 
-# OS & IDE
+# OS & Inne
 .DS_Store
-.idea/
+Thumbs.db
 .vscode/
 *.swp
-
-# logs && captures
-server/logs
-server/captures
+*~
