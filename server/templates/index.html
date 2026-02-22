@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CatWatch AI - Live Feed</title>
+    <style>
+        body { font-family: Arial, sans-serif; background: #1a1a1a; color: white; text-align: center; }
+        .container { margin-top: 50px; }
+        #stream { width: 80%; max-width: 800px; border: 5px solid #333; border-radius: 10px; }
+        .status { color: #0f0; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐾 CatWatch AI Live Feed</h1>
+        <div class="status">● System Online</div>
+        <img id="stream" src="{{ url_for('video_feed') }}" alt="Live Stream">
+    </div>
+</body>
+</html>
