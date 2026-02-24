@@ -14,12 +14,15 @@ app = Flask(__name__, static_folder='static', template_folder='templates')
 CORS(app)
 
 # --- KONFIGURACJA AI ---
-# Zmiana modelu na Medium (m) - wysoka precyzja kosztem większego użycia CPU
+# Model Medium (m) - wysoka precyzja
 model = YOLO('yolov8m.pt') 
 CAT_CLASS_ID = 15 
-# Przy modelu Medium próg 0.25-0.30 jest idealny, bo model rzadziej się "waha"
 CONFIDENCE_THRESHOLD = 0.28  
 COOLDOWN_SECONDS = 5 
+
+# NOWOŚĆ: Wyższa rozdzielczość analizy (imgsz=800)
+# Pozwala wykryć kota z większej odległości i z lepszą precyzją detali.
+AI_IMAGE_SIZE = 800
 
 # --- KONFIGURACJA ZAPISU I LOGÓW ---
 SAVE_COOLDOWN_SECONDS = 1800  # 30 minut
@@ -82,8 +85,8 @@ def save_cat_event(img):
 
 def ai_worker():
     global last_cat_seen, last_detection_timestamp, latest_frame, smoothed_box
-    # Informacja o modelu w konsoli
-    print(f"[{get_now().strftime('%H:%M:%S')}] Wątek AI: YOLOv8 Medium aktywne (Próg: {CONFIDENCE_THRESHOLD}).", flush=True)
+    # Informacja o parametrach w konsoli
+    print(f"[{get_now().strftime('%H:%M:%S')}] Wątek AI: YOLOv8 Medium | Rozdzielczość: {AI_IMAGE_SIZE}px | Próg: {CONFIDENCE_THRESHOLD}", flush=True)
     
     while True:
         frame_bytes = ai_queue.get()
@@ -93,8 +96,16 @@ def ai_worker():
 
             if img is not None:
                 raw_img = img.copy()
-                # Detekcja Medium - model głębszy, lepiej widzi detale
-                results = model.predict(img, classes=[CAT_CLASS_ID], conf=CONFIDENCE_THRESHOLD, verbose=False)
+                
+                # Detekcja z podbitą rozdzielczością imgsz
+                results = model.predict(
+                    img, 
+                    classes=[CAT_CLASS_ID], 
+                    conf=CONFIDENCE_THRESHOLD, 
+                    imgsz=AI_IMAGE_SIZE, # Wyższa rozdzielczość analizy
+                    verbose=False
+                )
+                
                 best_box = None
                 max_conf = 0
 
@@ -122,8 +133,8 @@ def ai_worker():
 
                     save_cat_event(raw_img)
 
-                    # Optymalizacja: Medium może spowalniać pętlę, używamy sprawnej konwersji
-                    _, buffer = cv2.imencode('.jpg', img, [cv2.IMWRITE_JPEG_QUALITY, 50])
+                    # Przy imgsz=800 warto utrzymać jakość klatek streamu
+                    _, buffer = cv2.imencode('.jpg', img, [cv2.IMWRITE_JPEG_QUALITY, 55])
                     latest_frame = buffer.tobytes()
                     new_frame_event.set()
 
@@ -131,12 +142,12 @@ def ai_worker():
                     if current_time - last_detection_timestamp > COOLDOWN_SECONDS:
                         last_detection_timestamp = current_time
                         last_cat_seen = get_now().strftime("%H:%M:%S")
-                        print(f"[{last_cat_seen}] 🔥 KOT WIDOCZNY (Medium Model - Pewność: {max_conf:.2f})", flush=True)
+                        print(f"[{last_cat_seen}] 🔥 KOT WIDOCZNY (Precise Mode @ {AI_IMAGE_SIZE}px)", flush=True)
                 else:
                     smoothed_box = None
             
-            # Kluczowe przy Medium: dajemy procesorowi odrobinę czasu na inne zadania
-            time.sleep(0.02) 
+            # Zwiększony sleep, aby procesor nie "gotował się" przy imgsz=800 i modelu Medium
+            time.sleep(0.04) 
         except Exception as e:
             print(f"Błąd AI: {e}")
         ai_queue.task_done()
@@ -204,7 +215,6 @@ def upload_frame():
     latest_frame = request.data
     new_frame_event.set()
     try:
-        # put_nowait jest ważne przy ciężkich modelach, by nie zapchać pamięci RAM klatkami
         ai_queue.put_nowait(request.data)
     except queue.Full: pass 
     return "OK", 200
