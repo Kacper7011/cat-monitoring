@@ -14,11 +14,11 @@ app = Flask(__name__, static_folder='static', template_folder='templates')
 CORS(app)
 
 # --- KONFIGURACJA AI ---
-# Zmiana modelu na Small (s) - dokładniejszy niż Nano (n)
-model = YOLO('yolov8s.pt') 
+# Zmiana modelu na Medium (m) - wysoka precyzja kosztem większego użycia CPU
+model = YOLO('yolov8m.pt') 
 CAT_CLASS_ID = 15 
-# Podniesiony próg dla dokładniejszego modelu
-CONFIDENCE_THRESHOLD = 0.25  
+# Przy modelu Medium próg 0.25-0.30 jest idealny, bo model rzadziej się "waha"
+CONFIDENCE_THRESHOLD = 0.28  
 COOLDOWN_SECONDS = 5 
 
 # --- KONFIGURACJA ZAPISU I LOGÓW ---
@@ -82,7 +82,8 @@ def save_cat_event(img):
 
 def ai_worker():
     global last_cat_seen, last_detection_timestamp, latest_frame, smoothed_box
-    print(f"[{get_now().strftime('%H:%M:%S')}] Wątek AI uruchomiony (Model: YOLOv8s, Próg: {CONFIDENCE_THRESHOLD}).", flush=True)
+    # Informacja o modelu w konsoli
+    print(f"[{get_now().strftime('%H:%M:%S')}] Wątek AI: YOLOv8 Medium aktywne (Próg: {CONFIDENCE_THRESHOLD}).", flush=True)
     
     while True:
         frame_bytes = ai_queue.get()
@@ -92,7 +93,7 @@ def ai_worker():
 
             if img is not None:
                 raw_img = img.copy()
-                # Detekcja z nowym modelem i progiem
+                # Detekcja Medium - model głębszy, lepiej widzi detale
                 results = model.predict(img, classes=[CAT_CLASS_ID], conf=CONFIDENCE_THRESHOLD, verbose=False)
                 best_box = None
                 max_conf = 0
@@ -121,6 +122,7 @@ def ai_worker():
 
                     save_cat_event(raw_img)
 
+                    # Optymalizacja: Medium może spowalniać pętlę, używamy sprawnej konwersji
                     _, buffer = cv2.imencode('.jpg', img, [cv2.IMWRITE_JPEG_QUALITY, 50])
                     latest_frame = buffer.tobytes()
                     new_frame_event.set()
@@ -129,11 +131,12 @@ def ai_worker():
                     if current_time - last_detection_timestamp > COOLDOWN_SECONDS:
                         last_detection_timestamp = current_time
                         last_cat_seen = get_now().strftime("%H:%M:%S")
-                        print(f"[{last_cat_seen}] 🔥 KOT WIDOCZNY (Pewność: {max_conf:.2f})", flush=True)
+                        print(f"[{last_cat_seen}] 🔥 KOT WIDOCZNY (Medium Model - Pewność: {max_conf:.2f})", flush=True)
                 else:
                     smoothed_box = None
             
-            time.sleep(0.01)
+            # Kluczowe przy Medium: dajemy procesorowi odrobinę czasu na inne zadania
+            time.sleep(0.02) 
         except Exception as e:
             print(f"Błąd AI: {e}")
         ai_queue.task_done()
@@ -201,6 +204,7 @@ def upload_frame():
     latest_frame = request.data
     new_frame_event.set()
     try:
+        # put_nowait jest ważne przy ciężkich modelach, by nie zapchać pamięci RAM klatkami
         ai_queue.put_nowait(request.data)
     except queue.Full: pass 
     return "OK", 200
