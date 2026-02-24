@@ -1,6 +1,7 @@
 document.addEventListener('DOMContentLoaded', () => {
     const statusElement = document.getElementById('last-seen');
-    const batteryElement = document.getElementById('battery-level'); // Nowy element
+    const batteryBar = document.getElementById('battery-level-bar');
+    const batteryText = document.getElementById('battery-text');
     const zoomSlider = document.getElementById('zoom-slider');
     const zoomVal = document.getElementById('zoom-val');
     const torchBtn = document.getElementById('torch-btn');
@@ -10,49 +11,57 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let isTorchOn = false;
 
-    // Funkcja pomocnicza do kolorowania poziomu baterii
+    /**
+     * Aktualizuje graficzny interfejs baterii (pasek + tekst + kolor)
+     */
     function updateBatteryUI(batteryStr) {
-        if (!batteryElement || !batteryStr) return;
+        if (!batteryBar || !batteryText || !batteryStr) return;
         
-        batteryElement.innerText = batteryStr;
         const level = parseInt(batteryStr);
+        batteryText.innerText = batteryStr;
 
         if (isNaN(level)) {
-            batteryElement.style.color = "white";
+            batteryBar.style.width = "0%";
             return;
         }
 
+        // Ustawienie szerokości paska (wykorzystuje transition z CSS dla płynności)
+        batteryBar.style.width = level + "%";
+
+        // Dynamiczna zmiana kolorów zależnie od poziomu naładowania
+        let color = "#ff4444"; // Czerwony (domyślny dla niskiego stanu)
         if (level > 60) {
-            batteryElement.style.color = "#44ff44"; // Zielony
+            color = "#44ff44"; // Zielony
         } else if (level > 20) {
-            batteryElement.style.color = "#ffdd44"; // Żółty
-        } else {
-            batteryElement.style.color = "#ff4444"; // Czerwony
+            color = "#ffdd44"; // Żółty
         }
+
+        batteryBar.style.backgroundColor = color;
+        batteryText.style.color = color;
     }
 
-    // Główna funkcja pobierająca dane (status, logi, galeria)
+    /**
+     * Pobiera dane z serwera i aktualizuje UI
+     */
     async function refreshData() {
         try {
-            // Pobieranie statusu (ostatnie widzenie + bateria)
+            // 1. Pobieranie statusu (ostatnie widzenie + bateria)
             const sRes = await fetch('/status?t=' + Date.now(), { cache: "no-store" });
             if (sRes.ok) {
                 const sData = await sRes.json();
                 
-                // Aktualizacja czasu widzenia kota
                 if (sData.last_seen && sData.last_seen !== "Nigdy" && sData.last_seen !== "") {
                     statusElement.innerText = sData.last_seen;
                 } else {
                     statusElement.innerText = "Brak danych";
                 }
 
-                // Aktualizacja poziomu baterii
                 if (sData.battery) {
                     updateBatteryUI(sData.battery);
                 }
             }
 
-            // Pobieranie logów systemowych
+            // 2. Pobieranie logów
             const lRes = await fetch('/get_logs?t=' + Date.now(), { cache: "no-store" });
             if (lRes.ok) {
                 const logText = await lRes.text();
@@ -60,7 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 logViewer.scrollTop = logViewer.scrollHeight;
             }
 
-            // Pobieranie galerii zdjęć
+            // 3. Aktualizacja galerii
             const gRes = await fetch('/get_captures?t=' + Date.now(), { cache: "no-store" });
             if (gRes.ok) {
                 const images = await gRes.json();
@@ -73,11 +82,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }
         } catch (e) {
-            console.warn("Błąd podczas odświeżania danych (serwer może być zajęty).");
+            console.warn("Serwer nie odpowiedział na czas (prawdopodobnie obciążony detekcją).");
         }
     }
 
-    // Funkcja wysyłająca ustawienia (zoom, latarka)
+    /**
+     * Wysyła aktualne parametry kamery do serwera
+     */
     async function updateCamera() {
         try {
             await fetch('/settings', {
@@ -89,17 +100,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 })
             });
         } catch (e) {
-            console.error("Błąd: Nie można wysłać ustawień.");
+            console.error("Błąd połączenia przy aktualizacji ustawień.");
         }
     }
 
-    // Obsługa suwaka Zoom
+    // --- EVENT LISTENERS ---
+
     zoomSlider.addEventListener('input', () => {
         zoomVal.innerText = parseFloat(zoomSlider.value).toFixed(1);
         updateCamera();
     });
 
-    // Obsługa przycisku Latarki
     torchBtn.addEventListener('click', () => {
         isTorchOn = !isTorchOn;
         torchBtn.innerText = isTorchOn ? "Latarka: ON" : "Latarka: OFF";
@@ -107,9 +118,9 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCamera();
     });
 
-    // Interwał odświeżania - co 5 sekund pobieramy nowe dane
+    // Automatyczne odświeżanie co 5 sekund
     setInterval(refreshData, 5000); 
     
-    // Pierwsze wywołanie przy załadowaniu strony
+    // Inicjalizacja przy starcie
     refreshData();
 });

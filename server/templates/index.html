@@ -10,12 +10,21 @@
     <div class="dashboard">
         <header>
             <h1>🐾 Cat Detector <span id="live-badge" class="badge">Live</span></h1>
+            
             <div class="status-bar">
                 <div class="status-indicator">
-                    Ostatnio zaobserwowano: <span id="last-seen">{{ last_seen }}</span>
+                    <span class="label">Ostatnio zaobserwowano:</span>
+                    <span id="last-seen" class="value">{{ last_seen }}</span>
                 </div>
+
                 <div class="battery-indicator">
-                    Bateria telefonu: <span id="battery-level">---</span>
+                    <span class="label">Telefon:</span>
+                    <div class="battery-container">
+                        <div class="battery-shell">
+                            <div id="battery-level-bar" class="battery-level-bar"></div>
+                        </div>
+                        <span id="battery-text" class="value">---</span>
+                    </div>
                 </div>
             </div>
         </header>
@@ -45,6 +54,7 @@
             </div>
         </section>
     </div>
+
     <script src="{{ url_for('static', filename='js/main.js') }}"></script>
 </body>
 </html>
