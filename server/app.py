@@ -14,9 +14,11 @@ app = Flask(__name__, static_folder='static', template_folder='templates')
 CORS(app)
 
 # --- KONFIGURACJA AI ---
-model = YOLO('yolov8n.pt') 
+# Zmiana modelu na Small (s) - dokładniejszy niż Nano (n)
+model = YOLO('yolov8s.pt') 
 CAT_CLASS_ID = 15 
-CONFIDENCE_THRESHOLD = 0.15  # Ustawiono na 15% według życzenia
+# Podniesiony próg dla dokładniejszego modelu
+CONFIDENCE_THRESHOLD = 0.25  
 COOLDOWN_SECONDS = 5 
 
 # --- KONFIGURACJA ZAPISU I LOGÓW ---
@@ -40,7 +42,7 @@ smoothed_box = None
 
 # --- ZMIENNE GLOBALNE ---
 latest_frame = None
-latest_battery = "---" # Przechowuje aktualny stan baterii
+latest_battery = "---" 
 last_cat_seen = "Nigdy"
 last_detection_timestamp = 0
 ai_queue = queue.Queue(maxsize=1)
@@ -80,7 +82,7 @@ def save_cat_event(img):
 
 def ai_worker():
     global last_cat_seen, last_detection_timestamp, latest_frame, smoothed_box
-    print(f"[{get_now().strftime('%H:%M:%S')}] Wątek AI uruchomiony (Próg: {CONFIDENCE_THRESHOLD}).", flush=True)
+    print(f"[{get_now().strftime('%H:%M:%S')}] Wątek AI uruchomiony (Model: YOLOv8s, Próg: {CONFIDENCE_THRESHOLD}).", flush=True)
     
     while True:
         frame_bytes = ai_queue.get()
@@ -90,7 +92,7 @@ def ai_worker():
 
             if img is not None:
                 raw_img = img.copy()
-                # Detekcja z progiem 0.15
+                # Detekcja z nowym modelem i progiem
                 results = model.predict(img, classes=[CAT_CLASS_ID], conf=CONFIDENCE_THRESHOLD, verbose=False)
                 best_box = None
                 max_conf = 0
@@ -131,7 +133,6 @@ def ai_worker():
                 else:
                     smoothed_box = None
             
-            # Oddech dla procesora
             time.sleep(0.01)
         except Exception as e:
             print(f"Błąd AI: {e}")
@@ -147,7 +148,6 @@ def index():
 
 @app.route('/status')
 def get_status():
-    # Zwracamy zarówno czas ostatniego widzenia, jak i poziom baterii
     return jsonify({
         "last_seen": last_cat_seen,
         "battery": latest_battery
@@ -194,7 +194,6 @@ def upload_frame():
     global latest_frame, latest_battery
     if not request.data: return "No Data", 400
     
-    # Odczytujemy poziom baterii z parametrów URL (?battery=X)
     battery_val = request.args.get('battery')
     if battery_val:
         latest_battery = f"{battery_val}%"
