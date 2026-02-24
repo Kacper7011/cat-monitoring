@@ -10,7 +10,14 @@
     <div class="dashboard">
         <header>
             <h1>🐾 Cat Detector <span id="live-badge" class="badge">Live</span></h1>
-            <div class="status-indicator">Ostatnio zaobserwowano: <span id="last-seen">{{ last_seen }}</span></div>
+            <div class="status-bar">
+                <div class="status-indicator">
+                    Ostatnio zaobserwowano: <span id="last-seen">{{ last_seen }}</span>
+                </div>
+                <div class="battery-indicator">
+                    Bateria telefonu: <span id="battery-level">---</span>
+                </div>
+            </div>
         </header>
 
         <section class="controls">

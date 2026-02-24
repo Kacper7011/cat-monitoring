@@ -16,6 +16,7 @@ CORS(app)
 # --- KONFIGURACJA AI ---
 model = YOLO('yolov8n.pt') 
 CAT_CLASS_ID = 15 
+CONFIDENCE_THRESHOLD = 0.15  # Ustawiono na 15% według życzenia
 COOLDOWN_SECONDS = 5 
 
 # --- KONFIGURACJA ZAPISU I LOGÓW ---
@@ -39,6 +40,7 @@ smoothed_box = None
 
 # --- ZMIENNE GLOBALNE ---
 latest_frame = None
+latest_battery = "---" # Przechowuje aktualny stan baterii
 last_cat_seen = "Nigdy"
 last_detection_timestamp = 0
 ai_queue = queue.Queue(maxsize=1)
@@ -78,7 +80,7 @@ def save_cat_event(img):
 
 def ai_worker():
     global last_cat_seen, last_detection_timestamp, latest_frame, smoothed_box
-    print(f"[{get_now().strftime('%H:%M:%S')}] Wątek AI uruchomiony.", flush=True)
+    print(f"[{get_now().strftime('%H:%M:%S')}] Wątek AI uruchomiony (Próg: {CONFIDENCE_THRESHOLD}).", flush=True)
     
     while True:
         frame_bytes = ai_queue.get()
@@ -88,7 +90,8 @@ def ai_worker():
 
             if img is not None:
                 raw_img = img.copy()
-                results = model.predict(img, classes=[CAT_CLASS_ID], conf=0.3, verbose=False)
+                # Detekcja z progiem 0.15
+                results = model.predict(img, classes=[CAT_CLASS_ID], conf=CONFIDENCE_THRESHOLD, verbose=False)
                 best_box = None
                 max_conf = 0
 
@@ -124,9 +127,12 @@ def ai_worker():
                     if current_time - last_detection_timestamp > COOLDOWN_SECONDS:
                         last_detection_timestamp = current_time
                         last_cat_seen = get_now().strftime("%H:%M:%S")
-                        print(f"[{last_cat_seen}] 🔥 KOT WIDOCZNY", flush=True)
+                        print(f"[{last_cat_seen}] 🔥 KOT WIDOCZNY (Pewność: {max_conf:.2f})", flush=True)
                 else:
                     smoothed_box = None
+            
+            # Oddech dla procesora
+            time.sleep(0.01)
         except Exception as e:
             print(f"Błąd AI: {e}")
         ai_queue.task_done()
@@ -141,11 +147,14 @@ def index():
 
 @app.route('/status')
 def get_status():
-    return jsonify({"last_seen": last_cat_seen})
+    # Zwracamy zarówno czas ostatniego widzenia, jak i poziom baterii
+    return jsonify({
+        "last_seen": last_cat_seen,
+        "battery": latest_battery
+    })
 
 @app.route('/log_event', methods=['POST'])
 def log_event():
-    """Odbiera zdarzenia sieciowe z frontendu i zapisuje je do logów."""
     data = request.json
     event_msg = data.get('event', 'Nieznane zdarzenie')
     log(f"📱 STATUS: {event_msg}")
@@ -166,7 +175,6 @@ def handle_settings():
 def get_logs():
     if os.path.exists(LOG_FILE_PATH):
         with open(LOG_FILE_PATH, "r", encoding="utf-8") as f:
-            # Zwracamy ostatnie 50 linii dla czytelności
             lines = f.readlines()
             return "".join(lines[-50:])
     return "Brak aktywności w logach."
@@ -183,8 +191,14 @@ def serve_capture(filename):
 
 @app.route('/upload_frame', methods=['POST'])
 def upload_frame():
-    global latest_frame
+    global latest_frame, latest_battery
     if not request.data: return "No Data", 400
+    
+    # Odczytujemy poziom baterii z parametrów URL (?battery=X)
+    battery_val = request.args.get('battery')
+    if battery_val:
+        latest_battery = f"{battery_val}%"
+
     latest_frame = request.data
     new_frame_event.set()
     try:

@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
     const statusElement = document.getElementById('last-seen');
+    const batteryElement = document.getElementById('battery-level'); // Nowy element
     const zoomSlider = document.getElementById('zoom-slider');
     const zoomVal = document.getElementById('zoom-val');
     const torchBtn = document.getElementById('torch-btn');
@@ -9,17 +10,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let isTorchOn = false;
 
+    // Funkcja pomocnicza do kolorowania poziomu baterii
+    function updateBatteryUI(batteryStr) {
+        if (!batteryElement || !batteryStr) return;
+        
+        batteryElement.innerText = batteryStr;
+        const level = parseInt(batteryStr);
+
+        if (isNaN(level)) {
+            batteryElement.style.color = "white";
+            return;
+        }
+
+        if (level > 60) {
+            batteryElement.style.color = "#44ff44"; // Zielony
+        } else if (level > 20) {
+            batteryElement.style.color = "#ffdd44"; // Żółty
+        } else {
+            batteryElement.style.color = "#ff4444"; // Czerwony
+        }
+    }
+
     // Główna funkcja pobierająca dane (status, logi, galeria)
     async function refreshData() {
         try {
-            // Pobieranie statusu
+            // Pobieranie statusu (ostatnie widzenie + bateria)
             const sRes = await fetch('/status?t=' + Date.now(), { cache: "no-store" });
             if (sRes.ok) {
                 const sData = await sRes.json();
+                
+                // Aktualizacja czasu widzenia kota
                 if (sData.last_seen && sData.last_seen !== "Nigdy" && sData.last_seen !== "") {
                     statusElement.innerText = sData.last_seen;
                 } else {
                     statusElement.innerText = "Brak danych";
+                }
+
+                // Aktualizacja poziomu baterii
+                if (sData.battery) {
+                    updateBatteryUI(sData.battery);
                 }
             }
 

@@ -1,9 +1,11 @@
 package com.example.catmonitoring
 
 import android.Manifest
+import android.content.Context
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
+import android.os.BatteryManager
 import android.os.Bundle
 import android.util.Log
 import android.util.Size
@@ -28,7 +30,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var ipInput: EditText
     private lateinit var viewFinder: PreviewView
 
-    // Nowe: Obiekt do sterowania zoomem i latarką
     private var cameraControl: CameraControl? = null
     private var isPollerRunning = false
 
@@ -39,7 +40,7 @@ class MainActivity : AppCompatActivity() {
         ipInput = findViewById(R.id.ipInput)
         viewFinder = findViewById(R.id.viewFinder)
 
-        cameraExecutor = Executors.newFixedThreadPool(2) // Zwiększamy do 2, by jeden wątek obsługiwał poller
+        cameraExecutor = Executors.newFixedThreadPool(2)
 
         if (allPermissionsGranted()) {
             startCamera()
@@ -70,7 +71,6 @@ class MainActivity : AppCompatActivity() {
 
             try {
                 cameraProvider.unbindAll()
-                // Nowe: Pobieramy obiekt camera, aby uzyskać dostęp do cameraControl
                 val camera = cameraProvider.bindToLifecycle(
                     this,
                     CameraSelector.DEFAULT_BACK_CAMERA,
@@ -79,7 +79,6 @@ class MainActivity : AppCompatActivity() {
                 )
                 cameraControl = camera.cameraControl
 
-                // Uruchamiamy sprawdzanie ustawień
                 if (!isPollerRunning) {
                     startSettingsPoller()
                 }
@@ -91,7 +90,6 @@ class MainActivity : AppCompatActivity() {
         }, ContextCompat.getMainExecutor(this))
     }
 
-    // Nowe: Funkcja co sekundę pyta serwer o zoom i latarkę
     private fun startSettingsPoller() {
         isPollerRunning = true
         cameraExecutor.execute {
@@ -111,7 +109,6 @@ class MainActivity : AppCompatActivity() {
                                     val zoom = json.getDouble("zoom").toFloat()
                                     val torch = json.getBoolean("flashlight")
 
-                                    // Aplikujemy ustawienia na wątku głównym UI
                                     runOnUiThread {
                                         cameraControl?.setZoomRatio(zoom)
                                         cameraControl?.enableTorch(torch)
@@ -123,9 +120,15 @@ class MainActivity : AppCompatActivity() {
                         Log.e("POLLER", "Błąd pobierania ustawień: ${e.message}")
                     }
                 }
-                Thread.sleep(1000) // Sprawdzaj co 1 sekundę
+                Thread.sleep(1000)
             }
         }
+    }
+
+    // Nowe: Funkcja pomocnicza do pobierania poziomu baterii
+    private fun getBatteryLevel(): Int {
+        val batteryManager = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+        return batteryManager.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
     }
 
     private fun processCameraFrame(image: ImageProxy) {
@@ -143,7 +146,9 @@ class MainActivity : AppCompatActivity() {
             val rotatedBitmap = Bitmap.createBitmap(
                 bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true
             )
-            sendFrameToServer(rotatedBitmap, serverIp)
+
+            // Przesyłamy bitmapę oraz aktualny poziom baterii
+            sendFrameToServer(rotatedBitmap, serverIp, getBatteryLevel())
         } catch (e: Exception) {
             Log.e("CAMERA", "Błąd przetwarzania: ${e.message}")
         } finally {
@@ -151,13 +156,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun sendFrameToServer(rotatedBitmap: Bitmap, serverIp: String) {
+    private fun sendFrameToServer(rotatedBitmap: Bitmap, serverIp: String, battery: Int) {
         val stream = ByteArrayOutputStream()
         rotatedBitmap.compress(Bitmap.CompressFormat.JPEG, 30, stream)
         val byteArray = stream.toByteArray()
 
+        // Dodajemy parametr battery do adresu URL
         val request = Request.Builder()
-            .url("http://$serverIp:5000/upload_frame")
+            .url("http://$serverIp:5000/upload_frame?battery=$battery")
             .post(byteArray.toRequestBody("image/jpeg".toMediaType()))
             .build()
 
